@@ -33,7 +33,7 @@ const ZOOM_MAX    = 4;
    Esempio: { name: 'Catalogo 2025', file: 'pdfs/catalogo2025.pdf' }
 */
 const BUILTIN_PDFS = [
-  // { name: 'TEST', file: 'pdfs/catalogo.pdf' },
+  // { name: 'Brochure Onirico 2026 (1)', file: 'Brochure Onirico 2026 (1)' },
 ];
 
 /* ═══════════════════════════════════════════════════
