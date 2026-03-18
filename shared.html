@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Onirico Reader</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=DM+Serif+Display&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style-4.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"></script>
+  <style>
+    .shared-badge {
+      font-size: 10px; letter-spacing: .07em; text-transform: uppercase;
+      color: var(--ink-60); border: 1px solid var(--border);
+      border-radius: 3px; padding: 2px 7px; font-family: var(--f-body);
+    }
+    #shared-error {
+      display: none; position: absolute; inset: 0; z-index: 60;
+      flex-direction: column; align-items: center; justify-content: center;
+      gap: 14px; padding: 40px; background: var(--paper);
+    }
+    .err-glyph { font-family: var(--f-display); font-style: italic; font-size: 48px; opacity: .15; }
+    .err-title { font-family: var(--f-display); font-size: 20px; font-weight: 400; letter-spacing: -.02em; }
+    .err-body  { font-size: 13px; color: var(--ink-60); text-align: center; max-width: 360px; line-height: 1.65; }
+  </style>
+</head>
+<body>
+
+<div id="view-reader" class="view active">
+
+  <header class="reader-header">
+    <div class="logo-wrap">
+      <img src="logo.webp" alt="Logo" class="logo-img logo-small" onerror="this.style.display='none'" />
+      <span class="shared-badge">Condiviso</span>
+    </div>
+    <div class="doc-title-wrap">
+      <div class="doc-title" id="doc-title">—</div>
+    </div>
+    <div class="reader-actions">
+      <button class="icon-btn" id="btn-zoom-out" title="Zoom out">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-zoom-in" title="Zoom in">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-zoom-reset" title="Reset zoom">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3.05 11A9 9 0 1 1 5.6 5.6"/><polyline points="3 3 3 9 9 9"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-hand" title="Strumento mano">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 11V8a2 2 0 0 0-4 0v3"/><path d="M14 10V6a2 2 0 0 0-4 0v4"/><path d="M10 9.5V5a2 2 0 0 0-4 0v9"/><path d="M6 14c0 3.31 2.69 6 6 6s6-2.69 6-6v-3H6v3z"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-thumbs" title="Miniature">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-fs" title="Schermo intero">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="reader-body">
+    <aside class="thumb-sidebar" id="thumb-sidebar">
+      <div class="thumb-list" id="thumb-list"></div>
+    </aside>
+    <div class="reading-area" id="reading-area">
+      <div id="zoom-pan-wrap">
+        <div id="book-container"></div>
+      </div>
+      <button class="nav-arrow left-arrow" id="btn-prev">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <button class="nav-arrow right-arrow" id="btn-next">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+      <div class="loading-spinner" id="loading-spinner" style="display:flex">
+        <div class="spinner-ring"></div>
+        <div class="spinner-text">Caricamento…</div>
+      </div>
+      <div id="shared-error">
+        <div class="err-glyph">PDF</div>
+        <div class="err-title">Link non valido</div>
+        <div class="err-body">Il documento richiesto non è raggiungibile. Controlla che il link sia corretto o chiedi al mittente di condividerlo nuovamente.</div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="reader-footer">
+    <div class="footer-inner">
+      <div class="progress-wrap">
+        <div class="progress-track" id="progress-track">
+          <div class="progress-fill" id="progress-fill"></div>
+          <div class="progress-thumb" id="progress-thumb"></div>
+        </div>
+        <span class="page-indicator" id="page-indicator">0 / 0</span>
+      </div>
+      <div class="controls-row">
+        <div class="ctrl-group">
+          <button class="ctrl-btn" id="btn-first" title="Prima pagina">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg>
+          </button>
+          <button class="ctrl-btn" id="btn-prev2" title="Pagina precedente">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+        </div>
+        <div class="ctrl-group center-ctrl">
+          <button class="play-btn" id="btn-play">
+            <svg id="play-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </button>
+        </div>
+        <div class="ctrl-group">
+          <button class="ctrl-btn" id="btn-next2" title="Pagina successiva">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+          <button class="ctrl-btn" id="btn-last" title="Ultima pagina">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
+          </button>
+        </div>
+        <div class="ctrl-group speed-group">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <input type="range" class="speed-slider" id="speed-slider" min="0" max="4" step="1" value="2" />
+          <span class="speed-label" id="speed-label">3.5s</span>
+        </div>
+      </div>
+    </div>
+  </footer>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════
+   ONIRICO SHARED READER
+   Legge ?pdf=URL_ENCODED&name=TITOLO e carica il PDF.
+   Nessun accesso alla libreria.
+═══════════════════════════════════════════════════ */
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const $ = id => document.getElementById(id);
+
+let pageFlip    = null;
+let pdfDoc      = null;
+let totalPages  = 0;
+let currentPage = 1;
+let playing     = false;
+let playTimer   = null;
+let playSpeed   = 3500;
+let zoomLevel   = 1;
+let panX = 0, panY = 0;
+let isPanning = false, startX = 0, startY = 0;
+let handMode  = false;
+
+const speedMap    = [1500, 2500, 3500, 5000, 8000];
+const speedLabels = ['1.5s','2.5s','3.5s','5s','8s'];
+const ZOOM_STEP = 0.2, ZOOM_MIN = 0.5, ZOOM_MAX = 4;
+
+/* ── Parametri URL ── */
+function getParams() {
+  const p = new URLSearchParams(location.search);
+  return { pdf: p.get('pdf'), name: p.get('name') || 'Documento' };
+}
+
+/* ════ OPEN ════ */
+async function openUrl(url, name) {
+  $('doc-title').textContent = name;
+  document.title = name + ' — Onirico Reader';
+  showSpinner(true);
+  try {
+    if (pageFlip) { try { pageFlip.destroy(); } catch(e) {} pageFlip = null; }
+    pdfDoc = null; totalPages = 0; currentPage = 1;
+    $('thumb-list').innerHTML = '';
+
+    const area = $('zoom-pan-wrap');
+    const old  = $('book-container');
+    if (old) old.remove();
+    const bc = document.createElement('div');
+    bc.id = 'book-container';
+    area.insertBefore(bc, area.firstChild);
+
+    pdfDoc = await pdfjsLib.getDocument(url).promise;
+    totalPages = pdfDoc.numPages;
+
+    const fp   = await pdfDoc.getPage(1);
+    const ra   = $('reading-area');
+    const vp0  = fp.getViewport({ scale: 1 });
+    const scale = Math.min((ra.clientHeight / vp0.height) * .92,
+                           ((ra.clientWidth / 2) / vp0.width) * .92, 2);
+    const pageW = Math.floor(vp0.width * scale);
+    const pageH = Math.floor(vp0.height * scale);
+
+    const canvases = [];
+    for (let i = 1; i <= totalPages; i++) {
+      const pg = await pdfDoc.getPage(i);
+      const vp = pg.getViewport({ scale });
+      const cv = document.createElement('canvas');
+      cv.width = pageW; cv.height = pageH;
+      cv.className = 'book-page-canvas';
+      await pg.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+      canvases.push(cv);
+    }
+
+    buildThumbs(canvases);
+
+    pageFlip = new St.PageFlip(bc, {
+      width: pageW, height: pageH, size: 'fixed',
+      drawShadow: true, flippingTime: 700,
+      usePortrait: true, startZIndex: 10, autoSize: true, showCover: false,
+    });
+    pageFlip.loadFromImages(canvases.map(cv => {
+      const t = document.createElement('canvas');
+      t.width = cv.width; t.height = cv.height;
+      t.getContext('2d').drawImage(cv, 0, 0);
+      return cv.toDataURL();
+    }));
+    pageFlip.on('flip', e => { currentPage = e.data + 1; updateUI(); });
+    updateUI();
+    showSpinner(false);
+  } catch(err) {
+    showSpinner(false);
+    $('shared-error').style.display = 'flex';
+    console.error(err);
+  }
+}
+
+/* ════ THUMBS ════ */
+function buildThumbs(canvases) {
+  const list = $('thumb-list');
+  list.innerHTML = '';
+  canvases.forEach((cv, i) => {
+    const item = document.createElement('div');
+    item.className = 'thumb-item' + (i === 0 ? ' active' : '');
+    item.dataset.page = i + 1;
+    const mini = document.createElement('canvas');
+    mini.width = 120; mini.height = Math.round(120 * cv.height / cv.width);
+    mini.getContext('2d').drawImage(cv, 0, 0, mini.width, mini.height);
+    const num = document.createElement('div');
+    num.className = 'thumb-page-num'; num.textContent = i + 1;
+    item.appendChild(mini); item.appendChild(num);
+    item.addEventListener('click', () => goToPage(i + 1));
+    list.appendChild(item);
+  });
+}
+
+function updateThumbActive() {
+  document.querySelectorAll('.thumb-item').forEach(el =>
+    el.classList.toggle('active', +el.dataset.page === currentPage));
+  const a = $('thumb-list').querySelector('.thumb-item.active');
+  if (a) a.scrollIntoView({ block: 'nearest' });
+}
+
+/* ════ NAV ════ */
+function goToPage(n) {
+  if (!pageFlip || n < 1 || n > totalPages) return;
+  pageFlip.flip(n - 1); currentPage = n; updateUI();
+}
+function nextPage() { goToPage(currentPage + 1); }
+function prevPage() { goToPage(currentPage - 1); }
+function updateUI() {
+  $('page-indicator').textContent = `${currentPage} / ${totalPages}`;
+  const pct = totalPages > 1 ? (currentPage - 1) / (totalPages - 1) * 100 : 0;
+  $('progress-fill').style.width = pct + '%';
+  $('progress-thumb').style.left = pct + '%';
+  updateThumbActive();
+}
+
+/* ════ PLAY ════ */
+function togglePlay() { playing ? stopPlay() : startPlay(); }
+function startPlay() {
+  if (!totalPages) return;
+  playing = true;
+  $('play-icon').innerHTML = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
+  playTimer = setInterval(() => { if (currentPage >= totalPages) stopPlay(); else nextPage(); }, playSpeed);
+}
+function stopPlay() {
+  playing = false;
+  if (playTimer) { clearInterval(playTimer); playTimer = null; }
+  $('play-icon').innerHTML = '<polygon points="5 3 19 12 5 21 5 3"/>';
+}
+
+/* ════ ZOOM & PAN ════ */
+function applyTransform() {
+  $('zoom-pan-wrap').style.transform = `translate(${panX}px,${panY}px) scale(${zoomLevel})`;
+}
+function resetZoomPan() { zoomLevel = 1; panX = 0; panY = 0; applyTransform(); }
+function zoomIn()  { zoomLevel = Math.min(ZOOM_MAX, +(zoomLevel+ZOOM_STEP).toFixed(2)); applyTransform(); }
+function zoomOut() { zoomLevel = Math.max(ZOOM_MIN, +(zoomLevel-ZOOM_STEP).toFixed(2)); if (zoomLevel<=1){panX=0;panY=0;} applyTransform(); }
+
+function initZoomPan() {
+  const wrap = $('zoom-pan-wrap'), area = $('reading-area');
+  area.addEventListener('wheel', e => { e.preventDefault(); e.deltaY < 0 ? zoomIn() : zoomOut(); }, { passive: false });
+  wrap.addEventListener('mousedown', e => {
+    if (!handMode) return;
+    isPanning = true; startX = e.clientX - panX; startY = e.clientY - panY; wrap.classList.add('panning');
+  });
+  window.addEventListener('mousemove', e => { if (!isPanning) return; panX=e.clientX-startX; panY=e.clientY-startY; applyTransform(); });
+  window.addEventListener('mouseup', () => { isPanning = false; wrap.classList.remove('panning'); });
+  let ts = null;
+  wrap.addEventListener('touchstart', e => { if (!handMode||e.touches.length!==1) return; ts={x:e.touches[0].clientX-panX,y:e.touches[0].clientY-panY}; }, {passive:true});
+  wrap.addEventListener('touchmove',  e => { if (!handMode||!ts||e.touches.length!==1) return; panX=e.touches[0].clientX-ts.x; panY=e.touches[0].clientY-ts.y; applyTransform(); }, {passive:true});
+  wrap.addEventListener('touchend', () => { ts = null; });
+}
+
+function showSpinner(v) { $('loading-spinner').style.display = v ? 'flex' : 'none'; }
+
+function initProgress() {
+  $('progress-track').addEventListener('click', e => {
+    const r = $('progress-track').getBoundingClientRect();
+    goToPage(Math.max(1, Math.round((e.clientX-r.left)/r.width*(totalPages-1))+1));
+  });
+}
+
+/* ════ BOOT ════ */
+document.addEventListener('DOMContentLoaded', () => {
+  initZoomPan();
+  initProgress();
+
+  $('btn-prev').addEventListener('click', prevPage);
+  $('btn-next').addEventListener('click', nextPage);
+  $('btn-prev2').addEventListener('click', prevPage);
+  $('btn-next2').addEventListener('click', nextPage);
+  $('btn-first').addEventListener('click', () => goToPage(1));
+  $('btn-last').addEventListener('click',  () => goToPage(totalPages));
+  $('btn-play').addEventListener('click', togglePlay);
+  $('btn-zoom-in').addEventListener('click', zoomIn);
+  $('btn-zoom-out').addEventListener('click', zoomOut);
+  $('btn-zoom-reset').addEventListener('click', resetZoomPan);
+  $('btn-hand').addEventListener('click', () => {
+    handMode = !handMode;
+    $('btn-hand').classList.toggle('active', handMode);
+    $('reading-area').classList.toggle('hand-mode', handMode);
+  });
+  $('btn-thumbs').addEventListener('click', () => $('thumb-sidebar').classList.toggle('open'));
+  $('btn-fs').addEventListener('click', () => {
+    document.fullscreenElement ? document.exitFullscreen() : $('view-reader').requestFullscreen();
+  });
+  $('speed-slider').addEventListener('input', e => {
+    const idx = +e.target.value;
+    playSpeed = speedMap[idx]; $('speed-label').textContent = speedLabels[idx];
+    if (playing) { stopPlay(); startPlay(); }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key==='ArrowRight'||e.key==='ArrowDown') nextPage();
+    if (e.key==='ArrowLeft' ||e.key==='ArrowUp')   prevPage();
+    if (e.key==='+'||e.key==='=') zoomIn();
+    if (e.key==='-') zoomOut();
+    if (e.key==='0') resetZoomPan();
+  });
+
+  /* ── Carica PDF dall'URL ── */
+  const { pdf, name } = getParams();
+  if (pdf) {
+    openUrl(decodeURIComponent(pdf), decodeURIComponent(name));
+  } else {
+    showSpinner(false);
+    $('shared-error').style.display = 'flex';
+  }
+});
+</script>
+</body>
+</html>
